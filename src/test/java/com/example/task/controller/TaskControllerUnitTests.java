@@ -5,11 +5,15 @@ import com.example.task.service.TaskService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.Mockito.*;
@@ -17,6 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.ArgumentMatchers.any;
 
 @WebMvcTest(TaskController.class)
 public class TaskControllerUnitTests {
@@ -51,4 +56,59 @@ public class TaskControllerUnitTests {
 
         verify(taskService, times(1)).getAllTasks();
     }
+
+    @Test
+    void shouldCreateTask() throws Exception {
+        Task created = new Task("Nouvelle tâche");
+        when(taskService.addTask("Nouvelle tâche")).thenReturn(created);
+
+        mockMvc.perform(post("/tasks")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"description\": \"Nouvelle tâche\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.taskDescription").value("Nouvelle tâche"))
+                .andExpect(jsonPath("$.completed").value(false));
+
+        verify(taskService, times(1)).addTask("Nouvelle tâche");
+    }
+
+    @Test
+    void shouldDeleteTask() throws Exception {
+        String id = UUID.randomUUID().toString(); // String, pas UUID
+
+        mockMvc.perform(delete("/tasks/" + id))
+                .andExpect(status().isOk());
+
+        verify(taskService, times(1)).deleteTask(any(String.class));
+    }
+    @Test
+    void shouldReturn404WhenDeletingUnknownId() throws Exception {
+        String id = UUID.randomUUID().toString();
+        doThrow(new NoSuchElementException()).when(taskService).deleteTask(any(String.class));
+
+        mockMvc.perform(delete("/tasks/" + id))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldCompleteTask() throws Exception {
+        String id = UUID.randomUUID().toString();
+
+        doNothing().when(taskService).completeTask(any(String.class));
+
+        mockMvc.perform(put("/tasks/" + id + "/complete"))
+                .andExpect(status().isOk());
+
+        verify(taskService, times(1)).completeTask(any(String.class));
+    }
+
+    @Test
+    void shouldReturn404WhenCompletingUnknownId() throws Exception {
+        String id = UUID.randomUUID().toString();
+        doThrow(new NoSuchElementException()).when(taskService).completeTask(any(String.class));
+
+        mockMvc.perform(put("/tasks/" + id + "/complete"))
+                .andExpect(status().isNotFound());
+    }
+
 }
